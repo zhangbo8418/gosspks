@@ -19,6 +19,13 @@ var loggerSynology = log.WithFields(log.Fields{
 // RouteSynology serves packages in Syno compatible JSON format
 // This route is meant to serve packages to a Syno
 func RouteSynology(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if err := recover(); err != nil {
+			loggerSynology.Errorf("Panic occurred: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	}()
+
 	var synoPkgs syno.Packages
 	var err error
 	var paramLanguage,
@@ -67,6 +74,7 @@ func RouteSynology(w http.ResponseWriter, r *http.Request) {
 	if synoPkgs, err = GetPackagesFromCacheOrFileSystem(r, r.URL.Query().Get("language"), false); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		loggerSynology.Warn("Couldn't load packages from cache or filesystem")
+		return
 	}
 
 	// Filter and sort packages
@@ -133,6 +141,7 @@ func RouteSynology(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(jsonOutput); err != nil {
-		loggerSynology.Fatal(err)
+		loggerSynology.Errorf("Error encoding JSON: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
